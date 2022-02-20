@@ -1,89 +1,78 @@
-import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
-import { Dimensions, StyleSheet, Switch, Text, View } from "react-native";
+import React from "react";
+import { StyleSheet, Image, Dimensions } from "react-native";
+import {
+  GestureHandlerRootView,
+  PinchGestureHandler,
+  PinchGestureHandlerGestureEvent,
+} from "react-native-gesture-handler";
 import Animated, {
-  interpolateColor,
+  useAnimatedGestureHandler,
   useAnimatedStyle,
-  useDerivedValue,
+  useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 
-const Colors = {
-  dark: {
-    background: "#1E1E1E",
-    circle: "#252525",
-    text: "#F8F8F8",
-  },
-  light: {
-    background: "#F8F8F8",
-    circle: "#FFF",
-    text: "#1E1E1E",
-  },
-};
+// Credit to Mariana Ibanez https://unsplash.com/photos/NJ8Z8Y_xUKc
+const imageUri =
+  "https://images.unsplash.com/photo-1621569642780-4864752e847e?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=668&q=80";
 
-const SWITCH_TRACK_COLOR = {
-  true: "rgba(256, 0, 256, 0.2)",
-  false: "rgba(0,0,0,0.1)",
-};
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
-type Theme = "light" | "dark";
+const { width, height } = Dimensions.get("window");
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const scale = useSharedValue(1);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
 
-  // const progress = useSharedValue(0);
-  const progress = useDerivedValue(() => {
-    return theme === "dark" ? withTiming(1) : withTiming(0);
-  }, [theme]);
+  const pinchHandler =
+    useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
+      onActive: (event) => {
+        scale.value = event.scale;
+        focalX.value = event.focalX;
+        focalY.value = event.focalY;
+      },
+      onEnd: () => {
+        scale.value = withTiming(1);
+      },
+    });
 
   const rStyle = useAnimatedStyle(() => {
-    const backgroundColor = interpolateColor(
-      progress.value,
-      [0, 1],
-      [Colors.light.background, Colors.dark.background]
-    );
-
-    return { backgroundColor };
+    return {
+      transform: [
+        { translateX: focalX.value },
+        { translateY: focalY.value },
+        { translateX: -width / 2 },
+        { translateY: -height / 2 },
+        { scale: scale.value },
+        { translateX: -focalX.value },
+        { translateY: -focalY.value },
+        { translateX: width / 2 },
+        { translateY: height / 2 },
+      ],
+    };
   });
 
-  const rCircleStyle = useAnimatedStyle(() => {
-    const backgroundColor = interpolateColor(
-      progress.value,
-      [0, 1],
-      [Colors.light.circle, Colors.dark.circle]
-    );
-
-    return { backgroundColor };
-  });
-
-  const rTextStyle = useAnimatedStyle(() => {
-    const color = interpolateColor(
-      progress.value,
-      [0, 1],
-      [Colors.light.text, Colors.dark.text]
-    );
-
-    return { color };
+  const focalPointStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: focalX.value }, { translateY: focalY.value }],
+    };
   });
 
   return (
-    <Animated.View style={[styles.container, rStyle]}>
-      <Animated.Text style={[styles.text, rTextStyle]}>Theme</Animated.Text>
-      <Animated.View style={[styles.circle, rCircleStyle]}>
-        <Switch
-          value={theme === "dark"}
-          onValueChange={(toggled) => {
-            setTheme(toggled ? "dark" : "light");
-          }}
-          trackColor={SWITCH_TRACK_COLOR}
-          thumbColor={"violet"}
-        />
-      </Animated.View>
-    </Animated.View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PinchGestureHandler onGestureEvent={pinchHandler}>
+        <Animated.View style={{ flex: 1 }}>
+          <AnimatedImage
+            style={[{ flex: 1 }, rStyle]}
+            source={{ uri: imageUri }}
+          />
+          <Animated.View style={[styles.focalPoint, focalPointStyle]} />
+        </Animated.View>
+      </PinchGestureHandler>
+    </GestureHandlerRootView>
   );
 }
-
-const SIZE = Dimensions.get("window").width * 0.7;
 
 const styles = StyleSheet.create({
   container: {
@@ -92,26 +81,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  circle: {
-    width: SIZE,
-    height: SIZE,
-    backgroundColor: "#FFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: SIZE / 2,
-    shadowOffset: {
-      width: 0,
-      height: 20,
-    },
-    shadowRadius: 10,
-    shadowOpacity: 0.1,
-    elevation: 8,
-  },
-  text: {
-    fontSize: 70,
-    textTransform: "uppercase",
-    fontWeight: "700",
-    letterSpacing: 14,
-    marginBottom: 35,
+  focalPoint: {
+    ...StyleSheet.absoluteFillObject,
+    width: 20,
+    height: 20,
+    backgroundColor: "blue",
+    borderRadius: 10,
   },
 });
