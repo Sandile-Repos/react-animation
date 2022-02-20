@@ -1,104 +1,38 @@
-import { Dimensions, StyleSheet, View } from "react-native";
-import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
-import Animated, {
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import { StatusBar } from "expo-status-bar";
+import React, { useCallback, useRef } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import BottomSheet, { BottomSheetRefProps } from "./components/BottomSheet";
 
-interface AnimatedPosition {
-  x: Animated.SharedValue<number>;
-  y: Animated.SharedValue<number>;
-}
-
-const useFollowAnimatedPosition = ({ x, y }: AnimatedPosition) => {
-  const followX = useDerivedValue(() => {
-    return withSpring(x.value);
-  });
-
-  const followY = useDerivedValue(() => {
-    return withSpring(y.value);
-  });
-
-  const rStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: followX.value }, { translateY: followY.value }],
-    };
-  });
-
-  return { followX, followY, rStyle };
-};
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-const SIZE = 80;
 export default function App() {
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  const ref = useRef<BottomSheetRefProps>(null);
 
-  const context = useSharedValue({ x: 0, y: 0 });
-  // useAnimatedGestureHandler({})
-  const gesture = Gesture.Pan()
-    .onStart(() => {
-      context.value = { x: translateX.value, y: translateY.value };
-    })
-    .onUpdate((event) => {
-      translateX.value = event.translationX + context.value.x;
-      translateY.value = event.translationY + context.value.y;
-    })
-    .onEnd(() => {
-      if (translateX.value > SCREEN_WIDTH / 2) {
-        translateX.value = SCREEN_WIDTH - SIZE;
-      } else {
-        translateX.value = 0;
-      }
-    });
-
-  const {
-    followX: blueFollowX,
-    followY: blueFollowY,
-    rStyle: rBlueCircleStyle,
-  } = useFollowAnimatedPosition({
-    x: translateX,
-    y: translateY,
-  });
-
-  const {
-    followX: redFollowX,
-    followY: redFollowY,
-    rStyle: rRedCircleStyle,
-  } = useFollowAnimatedPosition({
-    x: blueFollowX,
-    y: blueFollowY,
-  });
-
-  const { rStyle: rGreenCircleStyle } = useFollowAnimatedPosition({
-    x: redFollowX,
-    y: redFollowY,
-  });
+  const onPress = useCallback(() => {
+    const isActive = ref?.current?.isActive();
+    if (isActive) {
+      ref?.current?.scrollTo(0);
+    } else {
+      ref?.current?.scrollTo(-300);
+    }
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
-        <Animated.View
-          style={[
-            styles.circle,
-            { backgroundColor: "green" },
-            rGreenCircleStyle,
-          ]}
-        />
-        <Animated.View
-          style={[styles.circle, { backgroundColor: "red" }, rRedCircleStyle]}
-        />
-        <GestureDetector gesture={gesture}>
-          <Animated.View style={[styles.circle, rBlueCircleStyle]} />
-        </GestureDetector>
+        <StatusBar style="light" />
+        <TouchableOpacity style={styles.button} onPress={onPress} />
+        <BottomSheet ref={ref}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "orange",
+            }}
+          >
+            <Text style={{ fontWeight: "bold", textAlign: "center" }}>
+              I'm a bottom sheet
+            </Text>
+          </View>
+        </BottomSheet>
       </View>
     </GestureHandlerRootView>
   );
@@ -107,14 +41,15 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  circle: {
-    position: "absolute",
-    height: SIZE,
+  button: {
+    height: 50,
+    borderRadius: 25,
     aspectRatio: 1,
-    backgroundColor: "blue",
-    borderRadius: SIZE / 2,
-    opacity: 0.8,
+    backgroundColor: "white",
+    opacity: 0.6,
   },
 });
