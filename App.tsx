@@ -1,78 +1,96 @@
-import React from "react";
-import { StyleSheet, Image, Dimensions } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import React, { useCallback, useRef } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Image,
+  Dimensions,
+  ImageBackground,
+} from "react-native";
 import {
   GestureHandlerRootView,
-  PinchGestureHandler,
-  PinchGestureHandlerGestureEvent,
+  TapGestureHandler,
 } from "react-native-gesture-handler";
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 
-// Credit to Mariana Ibanez https://unsplash.com/photos/NJ8Z8Y_xUKc
-const imageUri =
-  "https://images.unsplash.com/photo-1621569642780-4864752e847e?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=668&q=80";
-
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
-const { width, height } = Dimensions.get("window");
-
 export default function App() {
-  const scale = useSharedValue(1);
-  const focalX = useSharedValue(0);
-  const focalY = useSharedValue(0);
+  const scale = useSharedValue(0);
+  const opacity = useSharedValue(1);
 
-  const pinchHandler =
-    useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
-      onActive: (event) => {
-        scale.value = event.scale;
-        focalX.value = event.focalX;
-        focalY.value = event.focalY;
-      },
-      onEnd: () => {
-        scale.value = withTiming(1);
-      },
+  const doubleTapRef = useRef();
+
+  const rStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: Math.max(scale.value, 0) }],
+  }));
+
+  const rTextStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  const onDoubleTap = useCallback(() => {
+    scale.value = withSpring(1, undefined, (isFinished) => {
+      if (isFinished) {
+        scale.value = withDelay(500, withSpring(0));
+      }
     });
+  }, []);
 
-  const rStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: focalX.value },
-        { translateY: focalY.value },
-        { translateX: -width / 2 },
-        { translateY: -height / 2 },
-        { scale: scale.value },
-        { translateX: -focalX.value },
-        { translateY: -focalY.value },
-        { translateX: width / 2 },
-        { translateY: height / 2 },
-      ],
-    };
-  });
-
-  const focalPointStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: focalX.value }, { translateY: focalY.value }],
-    };
-  });
+  const onSingleTap = useCallback(() => {
+    opacity.value = withTiming(0, undefined, (isFinished) => {
+      if (isFinished) {
+        opacity.value = withDelay(500, withTiming(1));
+      }
+    });
+  }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <PinchGestureHandler onGestureEvent={pinchHandler}>
-        <Animated.View style={{ flex: 1 }}>
-          <AnimatedImage
-            style={[{ flex: 1 }, rStyle]}
-            source={{ uri: imageUri }}
-          />
-          <Animated.View style={[styles.focalPoint, focalPointStyle]} />
-        </Animated.View>
-      </PinchGestureHandler>
+    <GestureHandlerRootView style={styles.container}>
+      <TapGestureHandler waitFor={doubleTapRef} onActivated={onSingleTap}>
+        <TapGestureHandler
+          maxDelayMs={250}
+          ref={doubleTapRef}
+          numberOfTaps={2}
+          onActivated={onDoubleTap}
+        >
+          <Animated.View>
+            <ImageBackground
+              source={require("./assets/image.jpeg")}
+              style={styles.image}
+            >
+              <AnimatedImage
+                source={require("./assets/heart.png")}
+                style={[
+                  styles.image,
+                  {
+                    shadowOffset: { width: 0, height: 20 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 35,
+                  },
+                  rStyle,
+                ]}
+                resizeMode={"center"}
+              />
+            </ImageBackground>
+            <Animated.Text style={[styles.turtles, rTextStyle]}>
+              🐢🐢🐢🐢
+            </Animated.Text>
+          </Animated.View>
+        </TapGestureHandler>
+      </TapGestureHandler>
     </GestureHandlerRootView>
   );
 }
+
+const { width: SIZE } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   container: {
@@ -81,11 +99,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  focalPoint: {
-    ...StyleSheet.absoluteFillObject,
-    width: 20,
-    height: 20,
-    backgroundColor: "blue",
-    borderRadius: 10,
+  image: {
+    width: SIZE,
+    height: SIZE,
   },
+  turtles: { fontSize: 40, textAlign: "center", marginTop: 30 },
 });
