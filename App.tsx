@@ -1,107 +1,74 @@
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useRef } from "react";
-import {
-  StyleSheet,
-  Text,
-  View,
-  Image,
-  Dimensions,
-  ImageBackground,
-} from "react-native";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 import {
   GestureHandlerRootView,
-  TapGestureHandler,
+  PanGestureHandler,
+  PanGestureHandlerGestureEvent,
 } from "react-native-gesture-handler";
 import Animated, {
-  useAnimatedStyle,
+  cancelAnimation,
+  useAnimatedGestureHandler,
+  useDerivedValue,
   useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming,
+  withDecay,
 } from "react-native-reanimated";
+import Page, { PAGE_WIDTH } from "./components/Page";
 
-const AnimatedImage = Animated.createAnimatedComponent(Image);
+const titles = ["What's", "up", "mobile", "devs?"];
+
+type ContextType = {
+  x: number;
+};
+
+const MAX_TRANSLATE_X = -PAGE_WIDTH * (titles.length - 1);
 
 export default function App() {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(1);
+  const translateX = useSharedValue(0);
 
-  const doubleTapRef = useRef();
+  const clampedTranslateX = useDerivedValue(() => {
+    return Math.max(Math.min(translateX.value, 0), MAX_TRANSLATE_X);
+  });
 
-  const rStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: Math.max(scale.value, 0) }],
-  }));
-
-  const rTextStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  const onDoubleTap = useCallback(() => {
-    scale.value = withSpring(1, undefined, (isFinished) => {
-      if (isFinished) {
-        scale.value = withDelay(500, withSpring(0));
-      }
-    });
-  }, []);
-
-  const onSingleTap = useCallback(() => {
-    opacity.value = withTiming(0, undefined, (isFinished) => {
-      if (isFinished) {
-        opacity.value = withDelay(500, withTiming(1));
-      }
-    });
-  }, []);
+  const panGestureEvent = useAnimatedGestureHandler<
+    PanGestureHandlerGestureEvent,
+    ContextType
+  >({
+    onStart: (_, context) => {
+      context.x = clampedTranslateX.value;
+      cancelAnimation(translateX);
+    },
+    onActive: (event, context) => {
+      translateX.value = event.translationX + context.x;
+    },
+    onEnd: (event) => {
+      translateX.value = withDecay({ velocity: event.velocityX });
+    },
+  });
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <TapGestureHandler waitFor={doubleTapRef} onActivated={onSingleTap}>
-        <TapGestureHandler
-          maxDelayMs={250}
-          ref={doubleTapRef}
-          numberOfTaps={2}
-          onActivated={onDoubleTap}
-        >
-          <Animated.View>
-            <ImageBackground
-              source={require("./assets/image.jpeg")}
-              style={styles.image}
-            >
-              <AnimatedImage
-                source={require("./assets/heart.png")}
-                style={[
-                  styles.image,
-                  {
-                    shadowOffset: { width: 0, height: 20 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 35,
-                  },
-                  rStyle,
-                ]}
-                resizeMode={"center"}
+      <PanGestureHandler onGestureEvent={panGestureEvent}>
+        <Animated.View style={{ flex: 1, flexDirection: "row" }}>
+          {titles.map((title, index) => {
+            return (
+              <Page
+                key={index.toString()}
+                translateX={clampedTranslateX}
+                index={index}
+                title={title}
               />
-            </ImageBackground>
-            <Animated.Text style={[styles.turtles, rTextStyle]}>
-              🐢🐢🐢🐢
-            </Animated.Text>
-          </Animated.View>
-        </TapGestureHandler>
-      </TapGestureHandler>
+            );
+          })}
+        </Animated.View>
+      </PanGestureHandler>
     </GestureHandlerRootView>
   );
 }
-
-const { width: SIZE } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  image: {
-    width: SIZE,
-    height: SIZE,
-  },
-  turtles: { fontSize: 40, textAlign: "center", marginTop: 30 },
 });
